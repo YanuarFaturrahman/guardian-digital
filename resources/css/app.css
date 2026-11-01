@@ -1,0 +1,100 @@
+@import 'tailwindcss';
+
+@source '../views/**/*.blade.php';
+@source '../js/**/*.js';
+
+@theme {
+    --font-sans: 'Poppins', ui-sans-serif, system-ui, sans-serif;
+
+    --color-guard-950: #050d1f;
+    --color-guard-900: #0b1b3a;
+    --color-guard-800: #12274f;
+    --color-guard-500: #22d3ee;
+    --color-guard-400: #67e8f9;
+    --color-safe: #10b981;
+    --color-warn: #f59e0b;
+    --color-danger: #f43f5e;
+}
+
+body {
+    background: radial-gradient(ellipse at top, #12274f 0%, #050d1f 60%) fixed;
+}
+
+select.input option {
+    color: #0b1b3a;
+}
+
+@layer components {
+    .card {
+        @apply rounded-2xl border border-white/10 bg-white/5 p-5 shadow-lg backdrop-blur;
+    }
+    .btn {
+        @apply inline-flex cursor-pointer items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold transition;
+    }
+    .btn-primary {
+        @apply bg-guard-500 text-guard-950 hover:bg-guard-400;
+    }
+    .btn-ghost {
+        @apply border border-white/15 text-slate-100 hover:bg-white/10;
+    }
+    .btn-danger {
+        @apply bg-danger/90 text-white hover:bg-danger;
+    }
+    .input {
+        @apply w-full rounded-xl border border-white/15 bg-guard-900/70 px-4 py-2.5 text-sm text-white placeholder-slate-400 focus:border-guard-500 focus:outline-none focus:ring-2 focus:ring-guard-500/40;
+    }
+    .label {
+        @apply mb-1 block text-sm font-medium text-slate-300;
+    }
+    .chip {
+        @apply inline-flex items-center gap-1 rounded-full bg-white/10 px-3 py-1 text-xs font-medium;
+    }
+    .h1 {
+        @apply text-2xl font-bold tracking-tight md:text-3xl;
+    }
+    .h2 {
+        @apply text-lg font-semibold;
+    }
+}
+
+/* Gaya isi materi (hasil render Markdown) */
+.lesson-body h2 {
+    @apply mb-2 mt-6 text-lg font-semibold text-guard-400;
+}
+.lesson-body p {
+    @apply mb-3 leading-relaxed text-slate-200;
+}
+.lesson-body ul {
+    @apply mb-3 list-disc space-y-1 pl-6 text-slate-200;
+}
+.lesson-body strong {
+    @apply font-semibold text-white;
+}
+
+.lesson-body h3 {
+    @apply mb-1 mt-4 font-semibold text-white;
+}
+.lesson-body ol {
+    @apply mb-3 list-decimal space-y-1 pl-6 text-slate-200;
+}
+.lesson-body a {
+    @apply text-guard-400 underline;
+}
+.lesson-body blockquote {
+    @apply mb-3 border-l-4 border-guard-500/50 pl-4 italic text-slate-300;
+}
+.lesson-body em {
+    @apply italic;
+}
+.lesson-body code {
+    @apply rounded bg-white/10 px-1.5 py-0.5 text-sm;
+}
+
+/* Animasi masuk ringan */
+@keyframes rise {
+    from { opacity: 0; transform: translateY(8px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+.rise {
+    animation: rise 0.4s ease-out both;
+}
