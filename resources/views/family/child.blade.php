@@ -14,6 +14,8 @@
 
     @include('partials.student-report')
 
+    @include('partials.child-privacy')
+
     @if ($weakest && $weakest->mastery < 100)
         <div class="card mt-6 border-warn/40">
             <h2 class="h2">💬 Ide Obrolan Keluarga</h2>

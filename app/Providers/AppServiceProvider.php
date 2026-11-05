@@ -2,6 +2,15 @@
 
 namespace App\Providers;
 
+use App\Models\ActivityLog;
+use App\Models\Badge;
+use App\Models\Category;
+use App\Models\Lesson;
+use App\Models\SafetyAction;
+use App\Models\Scenario;
+use App\Models\School;
+use App\Models\User;
+use App\Observers\AuditObserver;
 use Illuminate\Support\Facades\URL;
 use Illuminate\Support\ServiceProvider;
 use Illuminate\Auth\Notifications\ResetPassword;
@@ -26,6 +35,24 @@ class AppServiceProvider extends ServiceProvider
         if (app()->environment('production')) {
             URL::forceScheme('https');
         }
+
+        // Jejak audit: catat tambah / ubah / hapus konten dan sekolah oleh pengguna yang login
+        foreach ([Category::class, Scenario::class, Lesson::class, Badge::class, SafetyAction::class, School::class] as $model) {
+            $model::observe(AuditObserver::class);
+        }
+
+        // Jejak audit: perubahan peran akun
+        User::updated(function (User $user) {
+            if ($user->wasChanged('role')) {
+                $from = $user->getOriginal('role');
+                ActivityLog::record(
+                    'user.role_changed',
+                    "Peran {$user->name} diubah dari {$from} menjadi {$user->role}",
+                    $user,
+                    ['dari' => $from, 'ke' => $user->role],
+                );
+            }
+        });
 
         ResetPassword::toMailUsing(function ($notifiable, string $token) {
             $url = url(route('password.reset', [

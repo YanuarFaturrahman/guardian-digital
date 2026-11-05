@@ -10,9 +10,31 @@ class ActionController extends Controller
 {
     public function index()
     {
+        $actions = SafetyAction::orderBy('priority')->orderBy('position')->get();
+        $doneIds = auth()->user()->safetyActions()->pluck('safety_actions.id');
+
+        // Kelompokkan per tingkat urgensi: Darurat, Penting, Tambahan
+        $tiers = collect(SafetyAction::PRIORITIES)
+            ->map(function (array $info, int $priority) use ($actions, $doneIds) {
+                $items = $actions->where('priority', $priority)->values();
+                $done = $items->whereIn('id', $doneIds)->count();
+                $total = $items->count();
+
+                return $info + [
+                    'priority' => $priority,
+                    'items' => $items,
+                    'done' => $done,
+                    'total' => $total,
+                    'percent' => $total ? (int) round($done / $total * 100) : 0,
+                ];
+            })
+            ->filter(fn (array $tier) => $tier['total'] > 0);
+
         return view('student.actions', [
-            'actions' => SafetyAction::orderBy('position')->get(),
-            'doneIds' => auth()->user()->safetyActions()->pluck('safety_actions.id'),
+            'tiers' => $tiers,
+            'doneIds' => $doneIds,
+            'totalDone' => $tiers->sum('done'),
+            'totalAll' => $tiers->sum('total'),
         ]);
     }
 

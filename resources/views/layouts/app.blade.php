@@ -9,6 +9,10 @@
     <link href="https://fonts.googleapis.com/css2? family=Poppins:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     @vite(['resources/css/app.css', 'resources/js/app.js'])
 </head>
+
+@auth
+    @include('partials.onboarding')
+@endauth
 <body class="min-h-screen font-sans text-slate-100 antialiased">
 
     @include('partials.navbar')
@@ -20,7 +24,11 @@
 
     <footer class="border-t border-white/10 py-6 text-center text-xs text-slate-400">
         Guardian Digital · Kenali · Pelajari · Lindungi<br>
-        Semua skenario adalah simulasi aman. Tidak ada uang atau data nyata yang dipakai.
+        Semua skenario adalah simulasi aman. Tidak ada uang atau data nyata yang dipakai.<br>
+        <a href="{{ route('privacy.policy') }}" class="hover:text-white hover:underline">Kebijakan Privasi</a>
+        @auth
+            · <a href="{{ route('privacy.account') }}" class="hover:text-white hover:underline">Privasi Akun</a>
+        @endauth
     </footer>
 </body>
 </html>

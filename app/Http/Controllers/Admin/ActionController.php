@@ -12,15 +12,29 @@ class ActionController extends Controller
 {
     public function index()
     {
+        $actions = SafetyAction::withCount('users')
+            ->orderBy('priority')->orderBy('position')->get();
+
         return view('admin.actions.index', [
-            'actions' => SafetyAction::withCount('users')->orderBy('position')->get(),
+            'actions' => $actions,
+            'groups' => $actions->groupBy('priority'),
         ]);
     }
 
-    public function create()
+    public function create(Request $request)
     {
+        // ?tingkat=1|2|3 dipakai oleh tombol "+ Tambah" di tiap tingkat
+        $priority = (int) $request->query('tingkat', 3);
+        if (! array_key_exists($priority, SafetyAction::PRIORITIES)) {
+            $priority = 3;
+        }
+
         return view('admin.actions.form', [
-            'action' => new SafetyAction(['icon' => '✅', 'xp_reward' => 25]),
+            'action' => new SafetyAction([
+                'icon' => '✅',
+                'priority' => $priority,
+                'xp_reward' => SafetyAction::PRIORITIES[$priority]['xp'],
+            ]),
         ]);
     }
 
@@ -62,13 +76,14 @@ class ActionController extends Controller
 
     private function validated(Request $request, ?SafetyAction $action = null): array
     {
-        return $request->validate([
+        $data = $request->validate([
             'icon' => ['required', 'string', 'max:8'],
             'title' => [
                 'required', 'string', 'max:120',
                 Rule::unique('safety_actions', 'title')->ignore($action?->id),
             ],
             'description' => ['required', 'string', 'max:400'],
+            'priority' => ['required', Rule::in(array_keys(SafetyAction::PRIORITIES))],
             'xp_reward' => ['required', 'integer', 'between:0,200'],
             'position' => ['nullable', 'integer', 'between:1,250'],
         ], [
@@ -77,12 +92,18 @@ class ActionController extends Controller
             'between.numeric' => ':attribute harus antara :min dan :max.',
             'integer' => ':attribute harus berupa angka bulat.',
             'unique' => 'Sudah ada aksi dengan :attribute yang sama.',
+            'in' => ':attribute tidak valid.',
         ], [
             'icon' => 'Ikon',
             'title' => 'Judul',
             'description' => 'Deskripsi',
+            'priority' => 'Tingkat urgensi',
             'xp_reward' => 'XP',
             'position' => 'Urutan',
         ]);
+
+        $data['priority'] = (int) $data['priority'];
+
+        return $data;
     }
 }

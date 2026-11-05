@@ -1,5 +1,9 @@
 <?php
 
+use App\Http\Controllers\ConsentController;
+use App\Http\Controllers\ParentConsentController;
+use App\Http\Controllers\PrivacyController;
+use App\Http\Controllers\OnboardingController;
 use App\Http\Controllers\SchoolAdmin;
 use App\Http\Controllers\PasswordChangeController;
 use App\Http\Controllers\PasswordResetController;
@@ -13,6 +17,14 @@ use App\Http\Controllers\Teacher;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/', [HomeController::class, 'index'])->name('home');
+
+// ---------- Privasi (publik) ----------
+Route::get('/kebijakan-privasi', [PrivacyController::class, 'policy'])->name('privacy.policy');
+// Persetujuan orang tua tanpa akun: tautan bertanda tangan dari email, ada masa berlaku
+Route::get('/persetujuan-orang-tua/{user}', [ParentConsentController::class, 'show'])
+    ->middleware('signed')->name('consent.parent');
+Route::post('/persetujuan-orang-tua/{user}', [ParentConsentController::class, 'store'])
+    ->middleware(['signed', 'throttle:10,1'])->name('consent.parent.store');
 
 // ---------- Tamu ----------
 Route::middleware('guest')->group(function () {
@@ -36,12 +48,25 @@ Route::middleware('guest')->group(function () {
 // ---------- Harus login ----------
 Route::middleware('auth')->group(function () {
     Route::post('/keluar', [AuthController::class, 'logout'])->name('logout');
+
+    // Persetujuan privasi dan hak atas data pribadi
+    Route::get('/persetujuan', [ConsentController::class, 'show'])->name('consent.show');
+    Route::post('/persetujuan', [ConsentController::class, 'accept'])->name('consent.accept');
+    Route::post('/persetujuan/orang-tua', [ConsentController::class, 'requestParent'])
+        ->middleware('throttle:3,60')->name('consent.request-parent');
+    Route::get('/akun/privasi', [PrivacyController::class, 'account'])->name('privacy.account');
+    Route::post('/akun/privasi/unduh', [PrivacyController::class, 'export'])
+        ->middleware('throttle:5,60')->name('privacy.export');
+    Route::delete('/akun/privasi', [PrivacyController::class, 'destroy'])
+        ->middleware('throttle:5,60')->name('privacy.destroy');
         // Ganti kata sandi wajib (setelah memakai kata sandi sementara)
     Route::get('/ganti-kata-sandi', [PasswordChangeController::class, 'edit'])->name('password.force');
     Route::post('/ganti-kata-sandi', [PasswordChangeController::class, 'update'])
         ->middleware('throttle:10,1')->name('password.force.update');
     Route::get('/dashboard', [HomeController::class, 'dashboard'])->name('dashboard');
     Route::get('/papan-peringkat', [LeaderboardController::class, 'index'])->name('leaderboard');
+    Route::post('/onboarding/selesai', [OnboardingController::class, 'complete'])
+    ->name('onboarding.complete');
 
     // ----- Siswa -----
     Route::middleware('role:student')->prefix('siswa')->name('student.')->group(function () {
@@ -87,6 +112,14 @@ Route::middleware('auth')->group(function () {
         Route::get('/anak/{child}', [Family\DashboardController::class, 'show'])->name('child');
         Route::delete('/anak/{child}', [Family\DashboardController::class, 'unlink'])
             ->name('unlink');
+
+        // Hak privasi atas nama anak
+        Route::post('/anak/{child}/persetujuan', [Family\ChildPrivacyController::class, 'grant'])->name('consent.grant');
+        Route::delete('/anak/{child}/persetujuan', [Family\ChildPrivacyController::class, 'revoke'])->name('consent.revoke');
+        Route::post('/anak/{child}/data', [Family\ChildPrivacyController::class, 'export'])
+            ->middleware('throttle:5,60')->name('child.export');
+        Route::delete('/anak/{child}/akun', [Family\ChildPrivacyController::class, 'erase'])
+            ->middleware('throttle:5,60')->name('child.erase');
     });
 
     // ----- Guru -----
@@ -182,5 +215,28 @@ Route::post('/aksi', [Admin\ActionController::class, 'store'])->name('actions.st
 Route::get('/aksi/{action}/ubah', [Admin\ActionController::class, 'edit'])->name('actions.edit');
 Route::put('/aksi/{action}', [Admin\ActionController::class, 'update'])->name('actions.update');
 Route::delete('/aksi/{action}', [Admin\ActionController::class, 'destroy'])->name('actions.destroy');
+
+        // Sistem: keamanan, pengaturan, backup (hanya superadmin)
+        Route::prefix('sistem')->name('system.')->group(function () {
+            Route::get('/', [Admin\SystemController::class, 'index'])->name('index');
+
+            Route::get('/log', [Admin\ActivityLogController::class, 'index'])->name('logs');
+
+            Route::get('/pengaturan', [Admin\SettingController::class, 'edit'])->name('settings');
+            Route::put('/pengaturan', [Admin\SettingController::class, 'update'])->name('settings.update');
+
+            Route::get('/backup', [Admin\BackupController::class, 'index'])->name('backups');
+            Route::post('/backup', [Admin\BackupController::class, 'store'])
+                ->middleware('throttle:5,1')->name('backups.store');
+            Route::get('/backup/{file}', [Admin\BackupController::class, 'download'])
+                ->where('file', '[A-Za-z0-9._-]+')->name('backups.download');
+            Route::delete('/backup/{file}', [Admin\BackupController::class, 'destroy'])
+                ->where('file', '[A-Za-z0-9._-]+')->name('backups.destroy');
+
+            Route::get('/sesi', [Admin\SessionController::class, 'index'])->name('sessions');
+            Route::post('/sesi/keluarkan-semua', [Admin\SessionController::class, 'destroyAll'])->name('sessions.destroy-all');
+            Route::delete('/sesi/{id}', [Admin\SessionController::class, 'destroy'])
+                ->where('id', '[A-Za-z0-9]+')->name('sessions.destroy');
+        });
     });
 });

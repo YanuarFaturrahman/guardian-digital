@@ -20,8 +20,10 @@ return Application::configure(basePath: dirname(__DIR__))
 
         // Paksa pengguna yang memakai kata sandi sementara untuk menggantinya
         $middleware->web(append: [
+            \App\Http\Middleware\CheckMaintenanceMode::class,
             \App\Http\Middleware\EnsureAccountIsActive::class,
             \App\Http\Middleware\RequirePasswordChange::class,
+            \App\Http\Middleware\EnsurePrivacyConsent::class,
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {

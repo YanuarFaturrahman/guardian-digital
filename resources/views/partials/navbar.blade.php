@@ -16,6 +16,7 @@
             ['admin.lessons.index', 'Belajar'], ['admin.actions.index', 'Aksi'],
             ['admin.categories.index', 'Kategori'], ['admin.badges.index', 'Lencana'],
             ['users.index', 'Pengguna'], ['admin.schools.index', 'Sekolah'],
+            ['admin.system.index', 'Sistem'],
             ['leaderboard', 'Peringkat'],
         ],
         default => [],
@@ -33,7 +34,7 @@
             <nav class="hidden items-center gap-1 lg:flex">
                 @foreach ($links as [$route, $label])
                     <a href="{{ route($route) }}"
-                       class="rounded-lg {{ $user->role === 'superadmin' ? 'px-2' : 'px-3' }} py-2 text-sm hover:bg-white/10 {{ url()->current() === route($route) ? 'bg-white/10 text-guard-400' : 'text-slate-300' }}">
+                       class="rounded-lg {{ $user->role === 'superadmin' ? 'px-2' : 'px-3' }} py-2 text-sm hover:bg-white/10 {{ (url()->current() === route($route) || ($route === 'admin.system.index' && request()->routeIs('admin.system.*'))) ? 'bg-white/10 text-guard-400' : 'text-slate-300' }}">
                         {{ $label }}
                     </a>
                 @endforeach
@@ -44,6 +45,9 @@
                     <span class="chip hidden sm:inline-flex">⭐ {{ $user->xp }} XP · Lv {{ $user->levelData()['level'] }}</span>
                 @endif
                 <span class="hidden text-sm text-slate-300 sm:inline">{{ $user->avatar }} {{ $user->name }}</span>
+                
+                <button type="button" class="btn btn-ghost !px-3 !py-1.5 text-xs" data-onboarding-open title="Buka panduan penggunaan">❓ <span class="hidden sm:inline">Panduan</span></button>
+
                 <form method="POST" action="{{ route('logout') }}">
                     @csrf
                     <button class="btn btn-ghost !px-3 !py-1.5 text-xs">Keluar</button>
@@ -53,7 +57,9 @@
         @else
             <div class="flex items-center gap-2">
                 <a href="{{ route('login') }}" class="btn btn-ghost">Masuk</a>
-                <a href="{{ route('register') }}" class="btn btn-primary">Daftar</a>
+                @if (\App\Models\Setting::bool('registration_open'))
+                    <a href="{{ route('register') }}" class="btn btn-primary">Daftar</a>
+                @endif
             </div>
         @endauth
     </div>

@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
+use App\Models\ActivityLog;
 use App\Models\School;
 use App\Models\User;
 use Illuminate\Http\Request;
@@ -56,6 +57,8 @@ class SchoolController extends Controller
             User::where('school_id', $school->id)->update(['school_id' => $target->id]);
             $school->delete();
         });
+
+        ActivityLog::record('school.merged', "{$request->user()->name} menggabungkan sekolah \"{$school->name}\" ke \"{$target->name}\"", $target, ['dari_id' => $school->id]);
 
         return back()->with('status', "Sekolah digabungkan ke {$target->name}.");
     }

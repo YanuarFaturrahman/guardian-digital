@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
+use App\Models\ActivityLog;
 use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Arr;
@@ -71,6 +72,8 @@ class UserController extends Controller
         // Keluarkan pengguna dari semua perangkat (berlaku jika SESSION_DRIVER=database)
         DB::table('sessions')->where('user_id', $user->id)->delete();
 
+        ActivityLog::record('user.temp_password', "{$request->user()->name} membuat kata sandi sementara untuk {$user->name} ({$user->email})", $user);
+
         return back()->with('temp_password', [
             'name' => $user->name,
             'email' => $user->email,
@@ -89,6 +92,8 @@ class UserController extends Controller
 
         DB::table('sessions')->where('user_id', $user->id)->delete();
 
+        ActivityLog::record('user.deactivated', "{$request->user()->name} menonaktifkan akun {$user->name} ({$user->email})", $user);
+
         return back()->with('status', "Akun {$user->name} dinonaktifkan. Ia tidak bisa masuk sampai diaktifkan kembali.");
     }
 
@@ -97,6 +102,8 @@ class UserController extends Controller
         Gate::authorize('activate', $user);
 
         $user->forceFill(['deactivated_at' => null])->save();
+
+        ActivityLog::record('user.activated', "{$request->user()->name} mengaktifkan kembali akun {$user->name} ({$user->email})", $user);
 
         return back()->with('status', "Akun {$user->name} diaktifkan kembali.");
     }
@@ -138,15 +145,14 @@ class UserController extends Controller
         }
 
         $name = $user->name;
+        $email = $user->email;
+        $role = $user->role;
+        $userId = $user->id;
 
-        DB::transaction(function () use ($user) {
-            // Dua tabel ini tidak punya kunci asing ke pengguna
-            DB::table('sessions')->where('user_id', $user->id)->delete();
-            DB::table('password_reset_tokens')->where('email', $user->email)->delete();
+        // Menghapus akun beserta data turunannya (cascade) dan membersihkan data pribadi di log aktivitas
+        app(\App\Services\PrivacyService::class)->erase($user);
 
-            // Data turunan (riwayat, lencana, kelas, tautan) ikut terhapus lewat cascadeOnDelete
-            $user->delete();
-        });
+        ActivityLog::record('user.deleted', "{$request->user()->name} menghapus permanen akun {$name} ({$email}, {$role})", null, ['user_id' => $userId]);
 
         return redirect()->route('users.index')->with('status', "Akun {$name} dihapus secara permanen.");
     }

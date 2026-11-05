@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
+use App\Models\ActivityLog;
 use App\Models\School;
 use App\Models\User;
 use Illuminate\Http\Request;
@@ -33,7 +34,7 @@ class SchoolAdminController extends Controller
 
         $temp = User::generateTempPassword();
 
-        (new User)->forceFill([
+        $admin = (new User)->forceFill([
             'name' => $data['name'],
             'email' => $data['email'],
             'password' => $temp,
@@ -41,7 +42,10 @@ class SchoolAdminController extends Controller
             'school_id' => $data['school_id'],
             'avatar' => '🏫',
             'must_change_password' => true,
-        ])->save();
+        ]);
+        $admin->save();
+
+        ActivityLog::record('user.school_admin_created', "{$request->user()->name} membuat akun admin sekolah {$admin->name} ({$admin->email})", $admin);
 
         return redirect()->route('users.index')->with('temp_password', [
             'name' => $data['name'],

@@ -1,5 +1,6 @@
 import './bootstrap';
 import './sound';
+import './onboarding';
 
 // ---------- Salin teks ke clipboard (dengan cadangan untuk browser yang menolak) ----------
 function fallbackCopy(text) {

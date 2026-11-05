@@ -30,6 +30,8 @@ class User extends Authenticatable
         'xp' => 'integer',
         'must_change_password' => 'boolean',
         'deactivated_at' => 'datetime',
+        'onboarded_at' => 'datetime',
+        'birth_date' => 'date',
     ];
 }
 
@@ -142,6 +144,68 @@ protected function school(): Attribute
 {
     return Attribute::get(fn () => $this->schoolRef?->name);
 }
+
+    // ---------- Privasi & persetujuan ----------
+    public function consents(): HasMany
+    {
+        return $this->hasMany(Consent::class);
+    }
+
+    public function age(): ?int
+    {
+        return $this->birth_date?->age;
+    }
+
+    /** Di bawah usia dewasa (default 18 tahun, lihat config/privacy.php). */
+    public function isMinor(): bool
+    {
+        return $this->age() !== null && $this->age() < config('privacy.adult_age');
+    }
+
+    /** Persetujuan aktif untuk versi kebijakan yang berlaku sekarang. */
+    private function activeConsent(string $type): ?Consent
+    {
+        return $this->consents
+            ->where('type', $type)
+            ->where('policy_version', config('privacy.policy_version'))
+            ->whereNull('revoked_at')
+            ->sortByDesc('id')
+            ->first();
+    }
+
+    public function hasAcceptedPolicy(): bool
+    {
+        return $this->activeConsent('privacy') !== null;
+    }
+
+    public function hasParentalConsent(): bool
+    {
+        return $this->activeConsent('parental') !== null;
+    }
+
+    /**
+     * Apa yang masih menahan akun ini dari memakai aplikasi?
+     * null = aman. 'policy' = belum setuju kebijakan, 'birth_date' = siswa belum mengisi
+     * tanggal lahir, 'parent' = siswa di bawah 18 tahun belum disetujui orang tua / wali.
+     */
+    public function privacyGate(): ?string
+    {
+        if (! $this->hasAcceptedPolicy()) {
+            return 'policy';
+        }
+
+        if ($this->role === 'student') {
+            if ($this->birth_date === null) {
+                return 'birth_date';
+            }
+
+            if ($this->isMinor() && ! $this->hasParentalConsent()) {
+                return 'parent';
+            }
+        }
+
+        return null;
+    }
 
     // ---------- Level dan XP ----------
     public function levelData(): array
