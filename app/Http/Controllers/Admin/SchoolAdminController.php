@@ -42,6 +42,8 @@ class SchoolAdminController extends Controller
             'school_id' => $data['school_id'],
             'avatar' => '🏫',
             'must_change_password' => true,
+            // Dibuat langsung oleh superadmin, jadi emailnya dianggap sudah diverifikasi.
+            'email_verified_at' => now(),
         ]);
         $admin->save();
 

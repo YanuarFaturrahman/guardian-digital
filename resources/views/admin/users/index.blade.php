@@ -90,6 +90,13 @@
                                             @csrf
                                             <button class="text-guard-400 hover:underline">Atur sandi sementara</button>
                                         </form>
+                                        @if ($isSuper && $user->hasTwoFactorEnabled())
+                                            <form method="POST" action="{{ route('users.reset-two-factor', $user) }}"
+                                                  onsubmit="return confirm('Reset verifikasi dua langkah akun ini? Ia harus memasang ulang autentikator saat masuk berikutnya. Lakukan hanya jika pemilik akun benar-benar kehilangan perangkatnya.')">
+                                                @csrf
+                                                <button class="text-warn hover:underline">Reset 2FA</button>
+                                            </form>
+                                        @endif
                                         <form method="POST" action="{{ route('users.deactivate', $user) }}"
                                               onsubmit="return confirm('Nonaktifkan akun ini? Pengguna langsung keluar dari semua perangkat dan tidak bisa masuk sampai diaktifkan kembali. Datanya tetap tersimpan.')">
                                             @csrf

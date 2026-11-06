@@ -25,10 +25,7 @@
     <footer class="border-t border-white/10 py-6 text-center text-xs text-slate-400">
         Guardian Digital · Kenali · Pelajari · Lindungi<br>
         Semua skenario adalah simulasi aman. Tidak ada uang atau data nyata yang dipakai.<br>
-        <a href="{{ route('privacy.policy') }}" class="hover:text-white hover:underline">Kebijakan Privasi</a>
-        @auth
-            · <a href="{{ route('privacy.account') }}" class="hover:text-white hover:underline">Privasi Akun</a>
-        @endauth
+        <a href="{{ route('privacy.policy') }}" class="underline hover:text-white">Kebijakan Privasi</a>
     </footer>
 </body>
 </html>

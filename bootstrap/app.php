@@ -23,7 +23,10 @@ return Application::configure(basePath: dirname(__DIR__))
             \App\Http\Middleware\CheckMaintenanceMode::class,
             \App\Http\Middleware\EnsureAccountIsActive::class,
             \App\Http\Middleware\RequirePasswordChange::class,
-            \App\Http\Middleware\EnsurePrivacyConsent::class,
+            \App\Http\Middleware\EnsureEmailIsVerified::class,
+            \App\Http\Middleware\EnsureTwoFactorEnrollment::class,
+            \App\Http\Middleware\EnsurePrivacyCompliance::class,
+            \App\Http\Middleware\RunLazyScheduler::class,
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {

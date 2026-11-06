@@ -1,3 +1,17 @@
+# Guardian Digital
+
+Platform belajar keamanan digital berbasis simulasi (Laravel). Panduan keamanan, privasi, dan deploy: [docs/KEAMANAN-DAN-PRIVASI.md](docs/KEAMANAN-DAN-PRIVASI.md).
+
+```
+cp .env.example .env && php artisan key:generate
+php artisan migrate --seed     # lokal: membuat akun demo (*@guardian.test)
+php artisan test               # 136 tes otomatis
+# Lokal: isi TWO_FACTOR_REQUIRED=false di .env bila tidak ingin dipaksa memasang 2FA pada akun demo admin
+php artisan security:check     # pemeriksaan konfigurasi sebelum/sesudah deploy
+```
+
+---
+
 <p align="center"><a href="https://laravel.com" target="_blank"><img src="https://raw.githubusercontent.com/laravel/art/master/logo-lockup/5%20SVG/2%20CMYK/1%20Full%20Color/laravel-logolockup-cmyk-red.svg" width="400" alt="Laravel Logo"></a></p>
 
 <p align="center">

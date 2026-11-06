@@ -24,6 +24,14 @@ class UserPolicy
         return $this->canManage($actor, $target);
     }
 
+    /** Reset verifikasi dua langkah (perangkat hilang): hanya superadmin, tidak untuk diri sendiri. */
+    public function resetTwoFactor(User $actor, User $target): bool
+    {
+        return $actor->role === 'superadmin'
+            && ! $target->is($actor)
+            && $target->hasTwoFactorEnabled();
+    }
+
     /** Hapus permanen: hanya superadmin, dan tidak untuk superadmin lain atau diri sendiri. */
     public function forceDelete(User $actor, User $target): bool
     {

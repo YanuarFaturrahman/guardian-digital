@@ -4,14 +4,14 @@
 @section('content')
 <div class="rise mx-auto max-w-md">
     <div class="mb-4 rounded-xl border border-warn/50 bg-warn/15 px-4 py-3 text-sm text-amber-100">
-        <strong>⚠️ Kamu masuk dengan kata sandi sementara.</strong><br>
-        Demi keamanan akunmu, buat kata sandi baru sekarang. Halaman lain baru bisa dibuka setelah kata sandi diganti.
+        <strong>⚠️ Kata sandimu perlu diperbarui.</strong><br>
+        Kata sandi ini sementara atau belum memenuhi aturan keamanan terbaru. Demi keamanan akunmu, buat kata sandi baru sekarang. Halaman lain baru bisa dibuka setelah kata sandi diganti.
     </div>
 
     <div class="card">
         <h1 class="h1 mb-1">Buat kata sandi baru 🔐</h1>
         <p class="mb-5 text-sm text-slate-400">
-            Minimal 8 karakter, mengandung huruf dan angka. Jangan bagikan kata sandi ini ke siapa pun.
+            Minimal {{ auth()->user()->requiresTwoFactor() || \App\Rules\StrongPassword::privileged(auth()->user()->role) ? 12 : 8 }} karakter, mengandung huruf dan angka{{ \App\Rules\StrongPassword::privileged(auth()->user()->role) ? ' (huruf besar dan kecil)' : '' }}. Jangan bagikan kata sandi ini ke siapa pun.
         </p>
 
         <form method="POST" action="{{ route('password.force.update') }}" class="space-y-4">

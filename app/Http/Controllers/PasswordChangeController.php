@@ -5,7 +5,7 @@ namespace App\Http\Controllers;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
-use Illuminate\Validation\Rules\Password;
+use App\Rules\StrongPassword;
 use Illuminate\Validation\ValidationException;
 
 class PasswordChangeController extends Controller
@@ -29,16 +29,15 @@ class PasswordChangeController extends Controller
         abort_unless($user->must_change_password, 403);
 
         $data = $request->validate([
-            'password' => ['required', 'confirmed', Password::min(8)->letters()->numbers()],
+            'password' => ['required', 'confirmed', new StrongPassword($user->role, $user->email)],
         ], [
             'password.required' => 'Kata sandi baru wajib diisi.',
             'password.confirmed' => 'Konfirmasi kata sandi tidak sama.',
-            'password.min' => 'Kata sandi minimal 8 karakter.',
         ]);
 
         if (Hash::check($data['password'], $user->password)) {
             throw ValidationException::withMessages([
-                'password' => 'Kata sandi baru tidak boleh sama dengan kata sandi sementara.',
+                'password' => 'Kata sandi baru tidak boleh sama dengan kata sandi yang sekarang.',
             ]);
         }
 

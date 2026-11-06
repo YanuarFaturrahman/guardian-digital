@@ -1,9 +1,10 @@
 <?php
 
-use App\Http\Controllers\ConsentController;
-use App\Http\Controllers\ParentConsentController;
-use App\Http\Controllers\PrivacyController;
+use App\Http\Controllers\AccountController;
+use App\Http\Controllers\EmailVerificationController;
 use App\Http\Controllers\OnboardingController;
+use App\Http\Controllers\PrivacyController;
+use App\Http\Controllers\TwoFactorController;
 use App\Http\Controllers\SchoolAdmin;
 use App\Http\Controllers\PasswordChangeController;
 use App\Http\Controllers\PasswordResetController;
@@ -17,14 +18,7 @@ use App\Http\Controllers\Teacher;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/', [HomeController::class, 'index'])->name('home');
-
-// ---------- Privasi (publik) ----------
 Route::get('/kebijakan-privasi', [PrivacyController::class, 'policy'])->name('privacy.policy');
-// Persetujuan orang tua tanpa akun: tautan bertanda tangan dari email, ada masa berlaku
-Route::get('/persetujuan-orang-tua/{user}', [ParentConsentController::class, 'show'])
-    ->middleware('signed')->name('consent.parent');
-Route::post('/persetujuan-orang-tua/{user}', [ParentConsentController::class, 'store'])
-    ->middleware(['signed', 'throttle:10,1'])->name('consent.parent.store');
 
 // ---------- Tamu ----------
 Route::middleware('guest')->group(function () {
@@ -32,6 +26,11 @@ Route::middleware('guest')->group(function () {
     Route::post('/masuk', [AuthController::class, 'login'])->middleware('throttle:10,1');
     Route::get('/daftar', [AuthController::class, 'showRegister'])->name('register');
     Route::post('/daftar', [AuthController::class, 'register'])->middleware('throttle:10,1');
+
+    // Tantangan verifikasi dua langkah (pengguna belum login penuh, hanya lolos kata sandi).
+    Route::get('/verifikasi-dua-langkah', [TwoFactorController::class, 'challenge'])->name('two-factor.challenge');
+    Route::post('/verifikasi-dua-langkah', [TwoFactorController::class, 'verify'])
+        ->middleware('throttle:10,1')->name('two-factor.challenge.store');
 
     // Lupa dan atur ulang kata sandi.
     // Nama route (password.*) dipakai oleh Laravel saat membuat tautan di email.
@@ -48,23 +47,44 @@ Route::middleware('guest')->group(function () {
 // ---------- Harus login ----------
 Route::middleware('auth')->group(function () {
     Route::post('/keluar', [AuthController::class, 'logout'])->name('logout');
-
-    // Persetujuan privasi dan hak atas data pribadi
-    Route::get('/persetujuan', [ConsentController::class, 'show'])->name('consent.show');
-    Route::post('/persetujuan', [ConsentController::class, 'accept'])->name('consent.accept');
-    Route::post('/persetujuan/orang-tua', [ConsentController::class, 'requestParent'])
-        ->middleware('throttle:3,60')->name('consent.request-parent');
-    Route::get('/akun/privasi', [PrivacyController::class, 'account'])->name('privacy.account');
-    Route::post('/akun/privasi/unduh', [PrivacyController::class, 'export'])
-        ->middleware('throttle:5,60')->name('privacy.export');
-    Route::delete('/akun/privasi', [PrivacyController::class, 'destroy'])
-        ->middleware('throttle:5,60')->name('privacy.destroy');
         // Ganti kata sandi wajib (setelah memakai kata sandi sementara)
     Route::get('/ganti-kata-sandi', [PasswordChangeController::class, 'edit'])->name('password.force');
     Route::post('/ganti-kata-sandi', [PasswordChangeController::class, 'update'])
         ->middleware('throttle:10,1')->name('password.force.update');
     Route::get('/dashboard', [HomeController::class, 'dashboard'])->name('dashboard');
     Route::get('/papan-peringkat', [LeaderboardController::class, 'index'])->name('leaderboard');
+
+    // Verifikasi email
+    Route::get('/verifikasi-email', [EmailVerificationController::class, 'notice'])->name('verification.notice');
+    Route::get('/verifikasi-email/{id}/{hash}', [EmailVerificationController::class, 'verify'])
+        ->middleware('signed')->name('verification.verify');
+    Route::post('/verifikasi-email/kirim-ulang', [EmailVerificationController::class, 'resend'])
+        ->middleware('throttle:3,1')->name('verification.send');
+
+    // Persetujuan privasi dan orang tua
+    Route::get('/privasi/persetujuan', [PrivacyController::class, 'showAccept'])->name('privacy.accept');
+    Route::post('/privasi/persetujuan', [PrivacyController::class, 'accept'])->name('privacy.accept.store');
+    Route::get('/persetujuan-orang-tua', [PrivacyController::class, 'consentPending'])->name('consent.pending');
+
+    // Akun: keamanan dan privasi
+    Route::get('/akun/keamanan', [AccountController::class, 'security'])->name('account.security');
+    Route::put('/akun/kata-sandi', [AccountController::class, 'updatePassword'])
+        ->middleware('throttle:10,1')->name('account.password.update');
+    Route::get('/akun/privasi', [AccountController::class, 'privacy'])->name('account.privacy');
+    Route::get('/akun/data', [AccountController::class, 'export'])
+        ->middleware('throttle:5,60')->name('account.export');
+    Route::delete('/akun', [AccountController::class, 'destroy'])
+        ->middleware('throttle:5,1')->name('account.delete');
+
+    // Pengaturan verifikasi dua langkah
+    Route::get('/akun/dua-langkah', [TwoFactorController::class, 'setup'])->name('two-factor.setup');
+    Route::post('/akun/dua-langkah', [TwoFactorController::class, 'enable'])
+        ->middleware('throttle:10,1')->name('two-factor.enable');
+    Route::post('/akun/dua-langkah/kode-pemulihan', [TwoFactorController::class, 'regenerate'])
+        ->middleware('throttle:5,1')->name('two-factor.recovery');
+    Route::delete('/akun/dua-langkah', [TwoFactorController::class, 'disable'])
+        ->middleware('throttle:5,1')->name('two-factor.disable');
+
     Route::post('/onboarding/selesai', [OnboardingController::class, 'complete'])
     ->name('onboarding.complete');
 
@@ -72,7 +92,7 @@ Route::middleware('auth')->group(function () {
     Route::middleware('role:student')->prefix('siswa')->name('student.')->group(function () {
         Route::get('/', [Student\DashboardController::class, 'index'])->name('dashboard');
         Route::post('/kelas/gabung', [Student\DashboardController::class, 'joinClass'])
-            ->name('class.join');
+            ->middleware('throttle:10,1')->name('class.join');
 
         // PERBAIKAN: route ini sebelumnya belum ada
         Route::post('/sekolah', [Student\DashboardController::class, 'updateSchool'])
@@ -108,18 +128,17 @@ Route::middleware('auth')->group(function () {
     // ----- Orang tua -----
     Route::middleware('role:parent')->prefix('orang-tua')->name('family.')->group(function () {
         Route::get('/', [Family\DashboardController::class, 'index'])->name('dashboard');
-        Route::post('/hubungkan', [Family\DashboardController::class, 'link'])->name('link');
+        Route::post('/hubungkan', [Family\DashboardController::class, 'link'])
+            ->middleware('throttle:10,1')->name('link');
+        Route::get('/anak/{child}/data', [Family\DashboardController::class, 'export'])
+            ->middleware('throttle:5,60')->name('child.export');
+        Route::post('/anak/{child}/cabut-persetujuan', [Family\DashboardController::class, 'withdrawConsent'])
+            ->name('child.withdraw');
+        Route::delete('/anak/{child}/hapus', [Family\DashboardController::class, 'destroyChild'])
+            ->middleware('throttle:5,1')->name('child.delete');
         Route::get('/anak/{child}', [Family\DashboardController::class, 'show'])->name('child');
         Route::delete('/anak/{child}', [Family\DashboardController::class, 'unlink'])
             ->name('unlink');
-
-        // Hak privasi atas nama anak
-        Route::post('/anak/{child}/persetujuan', [Family\ChildPrivacyController::class, 'grant'])->name('consent.grant');
-        Route::delete('/anak/{child}/persetujuan', [Family\ChildPrivacyController::class, 'revoke'])->name('consent.revoke');
-        Route::post('/anak/{child}/data', [Family\ChildPrivacyController::class, 'export'])
-            ->middleware('throttle:5,60')->name('child.export');
-        Route::delete('/anak/{child}/akun', [Family\ChildPrivacyController::class, 'erase'])
-            ->middleware('throttle:5,60')->name('child.erase');
     });
 
     // ----- Guru -----
@@ -142,6 +161,8 @@ Route::middleware('auth')->group(function () {
         Route::get('/', [Admin\UserController::class, 'index'])->name('index');
         Route::post('/{user}/sandi-sementara', [Admin\UserController::class, 'tempPassword'])
             ->middleware('throttle:20,1')->name('temp-password');
+        Route::post('/{user}/reset-dua-langkah', [Admin\UserController::class, 'resetTwoFactor'])
+            ->middleware('throttle:20,1')->name('reset-two-factor');
         Route::post('/{user}/nonaktifkan', [Admin\UserController::class, 'deactivate'])->name('deactivate');
         Route::post('/{user}/aktifkan', [Admin\UserController::class, 'activate'])->name('activate');
     });

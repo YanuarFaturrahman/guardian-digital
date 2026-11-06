@@ -9,7 +9,9 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Password as PasswordBroker;
 use Illuminate\Support\Str;
-use Illuminate\Validation\Rules\Password;
+use App\Rules\StrongPassword;
+use Illuminate\Support\Facades\RateLimiter;
+use Throwable;
 
 class PasswordResetController extends Controller
 {
@@ -32,7 +34,13 @@ class PasswordResetController extends Controller
         // Hasilnya sengaja diabaikan. Pesan yang tampil selalu sama, baik email
         // terdaftar maupun tidak, agar orang asing tidak bisa menebak email siapa
         // saja yang punya akun (user enumeration).
-        PasswordBroker::sendResetLink($request->only('email'));
+        // Kegagalan SMTP dicatat di log tetapi tidak ditampilkan, supaya halaman ini tidak
+        // berubah perilaku dan tidak menjadi 500 saat layanan email sedang bermasalah.
+        try {
+            PasswordBroker::sendResetLink($request->only('email'));
+        } catch (Throwable $e) {
+            report($e);
+        }
 
         $minutes = config('auth.passwords.users.expire');
 
@@ -55,15 +63,16 @@ class PasswordResetController extends Controller
     /** Simpan kata sandi baru. */
     public function reset(Request $request): RedirectResponse
     {
+        $role = User::where('email', $request->input('email'))->value('role');
+
         $request->validate([
             'token' => ['required'],
             'email' => ['required', 'email'],
-            'password' => ['required', 'confirmed', Password::min(8)->letters()->numbers()],
+            'password' => ['required', 'confirmed', new StrongPassword($role, $request->input('email'))],
         ], [
             'email.required' => 'Email wajib diisi.',
             'password.required' => 'Kata sandi baru wajib diisi.',
             'password.confirmed' => 'Konfirmasi kata sandi tidak sama.',
-            'password.min' => 'Kata sandi minimal 8 karakter.',
         ]);
 
         $status = PasswordBroker::reset(
@@ -73,7 +82,16 @@ class PasswordResetController extends Controller
                 $user->forceFill([
                     'password' => $password,
                     'remember_token' => Str::random(60),
+                    'must_change_password' => false,
                 ])->save();
+
+                // Membuka tautan di email membuktikan pemilik akun menguasai alamat itu.
+                if (! $user->hasVerifiedEmail()) {
+                    $user->markEmailAsVerified();
+                }
+
+                // Buka kunci login per akun (kasus lupa kata sandi setelah salah berkali-kali).
+                RateLimiter::clear(AuthController::lockoutKey($user->email));
 
                 // Keluarkan akun dari semua perangkat yang masih login.
                 if (config('session.driver') === 'database') {

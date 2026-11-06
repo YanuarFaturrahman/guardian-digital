@@ -22,7 +22,7 @@ class CheckMaintenanceMode
         $user = $request->user();
 
         if ($user?->role === 'superadmin'
-            || $request->routeIs('login', 'logout')
+            || $request->routeIs('login', 'logout', 'two-factor.challenge', 'two-factor.challenge.store')
             || $request->is('masuk')) {
             return $next($request);
         }

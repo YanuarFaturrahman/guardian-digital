@@ -14,7 +14,28 @@
 
     @include('partials.student-report')
 
-    @include('partials.child-privacy')
+    @if ($student->isMinor() && (int) $student->parental_consent_by === (int) auth()->id())
+        <div class="card mt-6">
+            <h2 class="h2">Data &amp; persetujuan anak</h2>
+            <p class="mt-1 text-sm text-slate-400">Sebagai wali yang memberi persetujuan, kamu bisa mengunduh, mencabut persetujuan, atau menghapus data anak.</p>
+            <div class="mt-3 flex flex-wrap items-start gap-3">
+                <a href="{{ route('family.child.export', $student) }}" class="btn btn-ghost">⬇️ Unduh data anak</a>
+                <form method="POST" action="{{ route('family.child.withdraw', $student) }}"
+                      onsubmit="return confirm('Cabut persetujuan? Akun anak terkunci sampai kamu menyetujui lagi.')">
+                    @csrf
+                    <button class="btn btn-ghost text-warn">Cabut persetujuan</button>
+                </form>
+            </div>
+            <form method="POST" action="{{ route('family.child.delete', $student) }}" class="mt-5 space-y-3 border-t border-white/10 pt-4"
+                  onsubmit="return confirm('Hapus akun anak dan semua datanya secara permanen?')">
+                @csrf @method('DELETE')
+                <div class="text-sm font-semibold text-danger">Hapus akun anak secara permanen</div>
+                <input class="input max-w-sm" type="password" name="password" placeholder="Kata sandimu" required autocomplete="current-password">
+                <input class="input max-w-sm" name="confirm_text" placeholder="Ketik HAPUS untuk konfirmasi" required autocomplete="off">
+                <div><button class="btn btn-ghost text-danger">Hapus akun anak</button></div>
+            </form>
+        </div>
+    @endif
 
     @if ($weakest && $weakest->mastery < 100)
         <div class="card mt-6 border-warn/40">

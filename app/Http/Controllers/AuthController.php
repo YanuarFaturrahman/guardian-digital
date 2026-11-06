@@ -3,17 +3,20 @@
 namespace App\Http\Controllers;
 
 use App\Models\ActivityLog;
-use App\Models\Consent;
 use App\Models\School;
 use App\Models\Setting;
 use App\Models\User;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Arr;
+use App\Rules\StrongPassword;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Str;
-use Illuminate\Validation\Rules\Password;
+use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
+use Throwable;
 
 class AuthController extends Controller
 {
@@ -33,7 +36,34 @@ class AuthController extends Controller
             'password.required' => 'Kata sandi wajib diisi.',
         ]);
 
-        if (! Auth::attempt($credentials, $request->boolean('remember'))) {
+        $email = Str::lower(trim($credentials['email']));
+        $lockKey = self::lockoutKey($email);
+        $max = (int) config('security.lockout.max_attempts');
+
+        // Penguncian per akun: berlaku dari IP mana pun, termasuk saat kata sandi yang dimasukkan benar.
+        if (RateLimiter::tooManyAttempts($lockKey, $max)) {
+            ActivityLog::record(
+                'auth.lockout',
+                'Percobaan masuk ditolak karena akun terkunci sementara: ' . Str::limit($email, 120, ''),
+                null,
+                ['email' => Str::limit($email, 120, '')],
+            );
+
+            $minutes = max(1, (int) ceil(RateLimiter::availableIn($lockKey) / 60));
+
+            return back()
+                ->withErrors(['email' => "Terlalu banyak percobaan masuk. Coba lagi dalam {$minutes} menit."])
+                ->onlyInput('email');
+        }
+
+        $user = User::where('email', $credentials['email'])->first();
+
+        // Hash::check tetap dijalankan walau email tidak ada, agar waktu respons tidak membocorkan email terdaftar.
+        $valid = Hash::check($credentials['password'], $user?->password ?? self::dummyHash());
+
+        if (! $user || ! $valid) {
+            RateLimiter::hit($lockKey, (int) config('security.lockout.decay_minutes') * 60);
+
             ActivityLog::record(
                 'auth.login_failed',
                 'Gagal masuk dengan email ' . Str::limit($credentials['email'], 120, ''),
@@ -46,20 +76,63 @@ class AuthController extends Controller
                 ->onlyInput('email');
         }
 
-        // Mode pemeliharaan: hanya superadmin yang boleh masuk
-        if (Setting::bool('maintenance_mode') && Auth::user()->role !== 'superadmin') {
-            Auth::logout();
+        RateLimiter::clear($lockKey);
 
+        if ($user->deactivated_at) {
+            return back()
+                ->withErrors(['email' => 'Akun ini dinonaktifkan. Hubungi admin sekolah atau pengelola Guardian Digital untuk mengaktifkannya kembali.'])
+                ->onlyInput('email');
+        }
+
+        // Mode pemeliharaan: hanya superadmin yang boleh masuk
+        if (Setting::bool('maintenance_mode') && $user->role !== 'superadmin') {
             return back()
                 ->withErrors(['email' => Setting::read('maintenance_message') ?: 'Sistem sedang dalam pemeliharaan. Coba lagi nanti.'])
                 ->onlyInput('email');
         }
 
+        // Kata sandi lama yang terbukti lemah: paksa diganti setelah masuk.
+        if (config('security.force_strong_password_on_login')
+            && ! $user->must_change_password
+            && StrongPassword::check($credentials['password'], $user->role, $user->email) !== null) {
+            $user->forceFill(['must_change_password' => true])->save();
+        }
+
+        // Verifikasi dua langkah: kata sandi benar belum cukup, tunggu kode dari aplikasi autentikator.
+        if ($user->hasTwoFactorEnabled()) {
+            $request->session()->regenerate();
+            $request->session()->put('two_factor', [
+                'id' => $user->id,
+                'expires' => now()->addMinutes(5)->timestamp,
+            ]);
+
+            return redirect()->route('two-factor.challenge');
+        }
+
+        // Akun dengan 2FA wajib tidak boleh memakai "Ingat saya" (cookie itu melewati kode 2FA).
+        return $this->completeLogin($request, $user, $request->boolean('remember') && ! $user->requiresTwoFactor());
+    }
+
+    /** Selesaikan login: dipakai langsung (tanpa 2FA) dan setelah kode 2FA benar. */
+    public function completeLogin(Request $request, User $user, bool $remember = false): RedirectResponse
+    {
+        Auth::login($user, $remember);
         $request->session()->regenerate();
 
-        ActivityLog::record('auth.login', "{$request->user()->name} masuk", $request->user(), [], $request->user());
+        ActivityLog::record('auth.login', "{$user->name} masuk", $user, [], $user);
 
         return redirect()->intended(route('dashboard'));
+    }
+
+    public static function lockoutKey(string $email): string
+    {
+        return 'login-account|' . sha1(Str::lower(trim($email)));
+    }
+
+    private static function dummyHash(): string
+    {
+        // Hash bcrypt valid dari teks acak, hanya untuk menyamakan waktu pemeriksaan.
+        return '$2y$12$usesomesillystringfore7hnbRJHxXVLeakoG8K30oukPsA.ztMG';
     }
 
     public function showRegister()
@@ -82,25 +155,33 @@ class AuthController extends Controller
         $data = $request->validate([
             'name' => ['required', 'string', 'max:60'],
             'email' => ['required', 'email', 'max:120', 'unique:users,email'],
-            'password' => ['required', 'confirmed', Password::min(8)->letters()->numbers()],
+            'password' => ['required', 'confirmed', new StrongPassword($request->input('role'), $request->input('email'))],
             'role' => ['required', 'in:student,parent,teacher'],
             'school_id' => ['nullable', 'exists:schools,id'],
             'school_name' => ['nullable', 'string', 'min:4', 'max:120'],
-            'birth_date' => ['nullable', 'date', 'before:today', 'after:1930-01-01'],
             'accept_privacy' => ['accepted'],
+            'birth_date' => [
+                Rule::requiredIf($request->input('role') === 'student'),
+                'nullable', 'date', 'after:1930-01-01',
+                'before_or_equal:-' . (int) config('privacy.min_student_age') . ' years',
+            ],
+            'confirm_adult' => [Rule::requiredIf(in_array($request->input('role'), ['parent', 'teacher'], true)), 'accepted_if:role,parent,teacher'],
         ], [
             'name.required' => 'Nama tampilan wajib diisi.',
             'email.required' => 'Email wajib diisi.',
             'email.unique' => 'Email ini sudah terdaftar.',
             'password.required' => 'Kata sandi wajib diisi.',
             'password.confirmed' => 'Konfirmasi kata sandi tidak sama.',
-            'password.min' => 'Kata sandi minimal 8 karakter.',
             'role.in' => 'Peran yang dipilih tidak valid.',
             'school_id.exists' => 'Sekolah yang dipilih tidak ditemukan.',
             'school_name.min' => 'Nama sekolah terlalu pendek. Tulis nama lengkapnya.',
-            'birth_date.before' => 'Tanggal lahir harus sebelum hari ini.',
-            'birth_date.after' => 'Tanggal lahir tidak valid.',
-            'accept_privacy.accepted' => 'Kamu harus menyetujui Kebijakan Privasi untuk mendaftar.',
+            'accept_privacy.accepted' => 'Kamu perlu menyetujui Kebijakan Privasi untuk membuat akun.',
+            'birth_date.required' => 'Tanggal lahir siswa wajib diisi.',
+            'birth_date.date' => 'Format tanggal lahir belum benar.',
+            'birth_date.after' => 'Tanggal lahir tidak masuk akal.',
+            'birth_date.before_or_equal' => 'Siswa harus berusia minimal ' . (int) config('privacy.min_student_age') . ' tahun.',
+            'confirm_adult.required' => 'Guru dan orang tua harus menyatakan berusia 18 tahun atau lebih.',
+            'confirm_adult.accepted_if' => 'Guru dan orang tua harus menyatakan berusia 18 tahun atau lebih.',
         ]);
 
         // Orang tua tidak punya sekolah. Siswa hanya memilih dari daftar.
@@ -123,25 +204,25 @@ class AuthController extends Controller
             }
         }
 
-        if ($data['role'] === 'student' && empty($data['birth_date'])) {
-            throw ValidationException::withMessages([
-                'birth_date' => 'Siswa wajib mengisi tanggal lahir.',
-            ]);
-        }
-
         $avatars = ['🦊', '🦉', '🐼', '🐯', '🐙', '🦅', '🐺', '🐬', '🦁'];
 
         $user = User::create(
-            Arr::except($data, ['school_id', 'school_name', 'birth_date', 'accept_privacy'])
-            + ['school_id' => $schoolId, 'avatar' => Arr::random($avatars)]
+            Arr::except($data, ['school_id', 'school_name', 'accept_privacy', 'confirm_adult', 'birth_date'])
+            + [
+                'school_id' => $schoolId,
+                'avatar' => Arr::random($avatars),
+                'birth_date' => $data['role'] === 'student' ? $data['birth_date'] : null,
+                'privacy_accepted_at' => now(),
+                'privacy_policy_version' => config('privacy.policy_version'),
+            ]
         );
 
-        if ($data['role'] === 'student') {
-            $user->forceFill(['birth_date' => $data['birth_date']])->save();
+        // Kirim tautan verifikasi. Kegagalan kirim tidak boleh menggagalkan pendaftaran.
+        try {
+            $user->sendEmailVerificationNotification();
+        } catch (Throwable $e) {
+            report($e);
         }
-
-        // Bukti persetujuan Kebijakan Privasi saat mendaftar
-        Consent::grant($user, 'privacy', ['name' => $user->name, 'email' => $user->email, 'user_id' => $user->id]);
 
         Auth::login($user);
         $request->session()->regenerate();

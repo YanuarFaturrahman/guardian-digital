@@ -7,6 +7,8 @@ use App\Models\ActivityLog;
 use App\Models\Setting;
 use App\Services\BackupService;
 use Illuminate\Http\Request;
+use App\Models\User;
+use App\Support\MailStatus;
 use Illuminate\Support\Facades\DB;
 
 /** Halaman ringkasan menu Sistem: status, pemeriksaan keamanan, dan info server. */
@@ -70,6 +72,30 @@ class SystemController extends Controller
                 'ok' => config('session.driver') === 'database',
                 'label' => 'Sesi disimpan di database',
                 'hint' => 'Fitur "Sesi Aktif" dan "Paksa keluar" hanya bekerja dengan SESSION_DRIVER=database.',
+            ],
+            [
+                'ok' => MailStatus::isDeliverable(),
+                'label' => 'Email benar-benar terkirim',
+                'hint' => MailStatus::describe() . ' Atur MAIL_MAILER=smtp dan kredensial SMTP (Brevo, Mailgun, Gmail SMTP, dll.) di environment variable. Tanpa ini, tautan atur ulang kata sandi dan verifikasi email tidak sampai ke pengguna.',
+            ],
+            [
+                'ok' => MailStatus::emailVerificationActive(),
+                'label' => 'Verifikasi email pendaftar aktif',
+                'hint' => 'Butuh EMAIL_VERIFICATION_REQUIRED=true dan email yang bisa terkirim.',
+            ],
+            [
+                'ok' => ! config('security.two_factor_required')
+                    ? false
+                    : User::whereIn('role', config('security.two_factor_roles'))->whereNull('two_factor_confirmed_at')->doesntExist(),
+                'label' => 'Semua admin memakai verifikasi dua langkah',
+                'hint' => config('security.two_factor_required')
+                    ? User::whereIn('role', config('security.two_factor_roles'))->whereNull('two_factor_confirmed_at')->count() . ' akun admin belum mengaktifkannya (mereka dipaksa mengaktifkan saat masuk berikutnya).'
+                    : 'TWO_FACTOR_REQUIRED=false. Aktifkan kembali agar admin wajib memakai 2FA.',
+            ],
+            [
+                'ok' => filled(config('privacy.contact_email')),
+                'label' => 'Kontak privasi sudah diisi',
+                'hint' => 'Isi PRIVACY_CONTACT_EMAIL dan PRIVACY_CONTROLLER_NAME agar Kebijakan Privasi memuat kontak yang benar.',
             ],
             [
                 'ok' => Setting::bool('backup_auto'),

@@ -81,6 +81,19 @@ class UserController extends Controller
         ]);
     }
 
+    public function resetTwoFactor(Request $request, User $user, \App\Services\TwoFactorService $twoFactor)
+    {
+        Gate::authorize('resetTwoFactor', $user);
+
+        $twoFactor->disable($user);
+        $user->forceFill(['remember_token' => Str::random(60)])->save();
+        DB::table('sessions')->where('user_id', $user->id)->delete();
+
+        ActivityLog::record('user.two_factor_reset', "{$request->user()->name} mereset verifikasi dua langkah {$user->name} ({$user->email})", $user);
+
+        return back()->with('status', "Verifikasi dua langkah {$user->name} direset. Ia akan diminta memasangnya ulang saat masuk.");
+    }
+
     public function deactivate(Request $request, User $user)
     {
         Gate::authorize('deactivate', $user);
@@ -149,8 +162,14 @@ class UserController extends Controller
         $role = $user->role;
         $userId = $user->id;
 
-        // Menghapus akun beserta data turunannya (cascade) dan membersihkan data pribadi di log aktivitas
-        app(\App\Services\PrivacyService::class)->erase($user);
+        DB::transaction(function () use ($user) {
+            // Dua tabel ini tidak punya kunci asing ke pengguna
+            DB::table('sessions')->where('user_id', $user->id)->delete();
+            DB::table('password_reset_tokens')->where('email', $user->email)->delete();
+
+            // Data turunan (riwayat, lencana, kelas, tautan) ikut terhapus lewat cascadeOnDelete
+            $user->delete();
+        });
 
         ActivityLog::record('user.deleted', "{$request->user()->name} menghapus permanen akun {$name} ({$email}, {$role})", null, ['user_id' => $userId]);
 

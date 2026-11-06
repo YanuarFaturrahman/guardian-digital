@@ -46,6 +46,7 @@
                 @endif
                 <span class="hidden text-sm text-slate-300 sm:inline">{{ $user->avatar }} {{ $user->name }}</span>
                 
+                <a href="{{ route('account.security') }}" class="btn btn-ghost !px-3 !py-1.5 text-xs" title="Keamanan dan privasi akun">🔒 <span class="hidden sm:inline">Akun</span></a>
                 <button type="button" class="btn btn-ghost !px-3 !py-1.5 text-xs" data-onboarding-open title="Buka panduan penggunaan">❓ <span class="hidden sm:inline">Panduan</span></button>
 
                 <form method="POST" action="{{ route('logout') }}">

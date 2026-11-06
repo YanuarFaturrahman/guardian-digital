@@ -37,16 +37,6 @@
                 <input class="input" id="email" type="email" name="email" value="{{ old('email') }}" required>
             </div>
 
-            {{-- Tanggal lahir: hanya siswa --}}
-            <div id="birth-box">
-                <label class="label" for="birth_date">Tanggal lahir</label>
-                <input class="input max-w-xs" id="birth_date" type="date" name="birth_date"
-                       value="{{ old('birth_date') }}" max="{{ now()->subDay()->toDateString() }}">
-                <p class="mt-1 text-xs text-slate-400">
-                    Dipakai hanya untuk menentukan apakah orang tua / walimu perlu ikut menyetujui (jika usiamu di bawah 18 tahun).
-                </p>
-            </div>
-
             {{-- Sekolah: disembunyikan untuk Orang Tua --}}
             <div id="school-box" class="space-y-3 rounded-xl border border-white/10 bg-white/5 p-4">
                 <div>
@@ -78,6 +68,13 @@
                 </div>
             </div>
 
+            {{-- Tanggal lahir hanya untuk siswa (menentukan perlu tidaknya persetujuan orang tua) --}}
+            <div id="birth-box">
+                <label class="label" for="birth_date">Tanggal lahir</label>
+                <input class="input" id="birth_date" type="date" name="birth_date" value="{{ old('birth_date') }}">
+                <p class="mt-1 text-xs text-slate-400">Siswa di bawah {{ config('privacy.consent_age') }} tahun memerlukan persetujuan orang tua/wali sebelum bisa bermain.</p>
+            </div>
+
             <div class="grid gap-4 sm:grid-cols-2">
                 <div>
                     <label class="label" for="password">Kata sandi</label>
@@ -88,16 +85,16 @@
                     <input class="input" id="password_confirmation" type="password" name="password_confirmation" required>
                 </div>
             </div>
-            <p class="text-xs text-slate-400">Minimal 8 karakter, mengandung huruf dan angka.</p>
+            <p class="text-xs text-slate-400">Minimal 8 karakter, mengandung huruf dan angka, dan tidak berupa kata sandi yang umum.</p>
 
-            <label class="flex items-start gap-3 text-sm text-slate-300">
-                <input type="checkbox" name="accept_privacy" value="1" class="mt-1 h-4 w-4 accent-cyan-400" required
-                       {{ old('accept_privacy') ? 'checked' : '' }}>
-                <span>
-                    Saya sudah membaca dan menyetujui
-                    <a href="{{ route('privacy.policy') }}" target="_blank" rel="noopener" class="text-guard-400 underline">Kebijakan Privasi</a>.
-                    Jika usiaku di bawah 18 tahun, aku paham orang tua / waliku harus menyetujui sebelum akunku bisa dipakai.
-                </span>
+            <label id="adult-box" class="flex items-start gap-2 text-sm text-slate-200">
+                <input type="checkbox" name="confirm_adult" value="1" class="mt-1 rounded" {{ old('confirm_adult') ? 'checked' : '' }}>
+                <span>Saya berusia 18 tahun atau lebih.</span>
+            </label>
+
+            <label class="flex items-start gap-2 text-sm text-slate-200">
+                <input type="checkbox" name="accept_privacy" value="1" class="mt-1 rounded" {{ old('accept_privacy') ? 'checked' : '' }} required>
+                <span>Saya sudah membaca dan menyetujui <a href="{{ route('privacy.policy') }}" target="_blank" class="text-guard-400 underline">Kebijakan Privasi</a>.</span>
             </label>
 
             <button class="btn btn-primary w-full">Daftar</button>
@@ -118,6 +115,8 @@
         const hintStudent = document.getElementById('hint-student');
         const birthBox = document.getElementById('birth-box');
         const birthInput = document.getElementById('birth_date');
+        const adultBox = document.getElementById('adult-box');
+        const adultInput = adultBox.querySelector('input');
 
         function sync() {
             const role = document.querySelector('input[name="role"]:checked')?.value;
@@ -131,10 +130,12 @@
             nameInput.disabled = !isTeacher;
             hintStudent.classList.toggle('hidden', isTeacher);
 
-            const isStudent = role === 'student';
+            const isStudent = !isParent && !isTeacher;
             birthBox.classList.toggle('hidden', !isStudent);
             birthInput.disabled = !isStudent;
             birthInput.required = isStudent;
+            adultBox.classList.toggle('hidden', isStudent);
+            adultInput.disabled = isStudent;
         }
 
         document.querySelectorAll('input[name="role"]').forEach((radio) =>

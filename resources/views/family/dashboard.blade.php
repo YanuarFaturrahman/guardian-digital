@@ -11,8 +11,14 @@
         <p class="mt-1 text-sm text-slate-400">Minta anakmu membuka Beranda Siswa dan menunjukkan <strong>Kode Tautan</strong> (contoh: GD-AB12CD).</p>
         <form method="POST" action="{{ route('family.link') }}" class="mt-3 flex flex-wrap gap-2">
             @csrf
-            <input class="input max-w-xs" name="code" placeholder="GD-XXXXXX" required maxlength="12">
+            <input class="input max-w-xs" name="code" placeholder="GD-XXXXXX" required maxlength="12" value="{{ old('code') }}">
             <button class="btn btn-primary">Hubungkan</button>
+            <label class="flex w-full items-start gap-2 text-sm text-slate-300">
+                <input type="checkbox" name="consent" value="1" class="mt-1 rounded">
+                <span>Saya orang tua/wali sah anak ini dan <strong>menyetujui</strong> pemrosesan data pribadinya di Guardian Digital sesuai
+                    <a href="{{ route('privacy.policy') }}" target="_blank" class="text-guard-400 underline">Kebijakan Privasi</a>.
+                    (Wajib untuk anak di bawah {{ config('privacy.consent_age') }} tahun.)</span>
+            </label>
         </form>
     </div>
 

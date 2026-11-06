@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use Illuminate\Contracts\Auth\MustVerifyEmail;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -12,15 +13,19 @@ use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Illuminate\Support\Str;
 
-class User extends Authenticatable
+class User extends Authenticatable implements MustVerifyEmail
 {
     use HasFactory, Notifiable;
 
     protected $fillable = [
-    'name', 'email', 'password', 'role', 'school_id', 'avatar', 'link_code', 'xp',
-];
+        'name', 'email', 'password', 'role', 'school_id', 'avatar', 'link_code', 'xp',
+        'email_verified_at', 'birth_date', 'privacy_accepted_at', 'privacy_policy_version',
+        'parental_consent_at', 'parental_consent_by',
+    ];
 
-    protected $hidden = ['password', 'remember_token'];
+    protected $hidden = [
+        'password', 'remember_token', 'two_factor_secret', 'two_factor_recovery_codes',
+    ];
 
     protected function casts(): array
 {
@@ -31,7 +36,12 @@ class User extends Authenticatable
         'must_change_password' => 'boolean',
         'deactivated_at' => 'datetime',
         'onboarded_at' => 'datetime',
+        'two_factor_secret' => 'encrypted',
+        'two_factor_recovery_codes' => 'encrypted:array',
+        'two_factor_confirmed_at' => 'datetime',
         'birth_date' => 'date',
+        'privacy_accepted_at' => 'datetime',
+        'parental_consent_at' => 'datetime',
     ];
 }
 
@@ -89,6 +99,53 @@ class User extends Authenticatable
         return $password;
     }
 
+    // ---------- Verifikasi dua langkah ----------
+    public function requiresTwoFactor(): bool
+    {
+        return config('security.two_factor_required')
+            && in_array($this->role, config('security.two_factor_roles', []), true);
+    }
+
+    public function hasTwoFactorEnabled(): bool
+    {
+        return $this->two_factor_secret !== null && $this->two_factor_confirmed_at !== null;
+    }
+
+    // ---------- Privasi dan persetujuan orang tua ----------
+    public function age(): ?int
+    {
+        return $this->birth_date?->age;
+    }
+
+    public function hasAcceptedCurrentPrivacyPolicy(): bool
+    {
+        return $this->privacy_accepted_at !== null
+            && $this->privacy_policy_version === config('privacy.policy_version');
+    }
+
+    /** Siswa wajib mengisi tanggal lahir agar status persetujuan orang tua bisa ditentukan. */
+    public function needsBirthDate(): bool
+    {
+        return $this->role === 'student' && $this->birth_date === null;
+    }
+
+    /** Siswa di bawah usia persetujuan yang belum disetujui orang tua/wali. */
+    public function needsParentalConsent(): bool
+    {
+        return $this->role === 'student'
+            && $this->birth_date !== null
+            && $this->age() < (int) config('privacy.consent_age')
+            && $this->parental_consent_at === null;
+    }
+
+    /** Siswa di bawah usia persetujuan (sudah atau belum disetujui). */
+    public function isMinor(): bool
+    {
+        return $this->role === 'student'
+            && $this->birth_date !== null
+            && $this->age() < (int) config('privacy.consent_age');
+    }
+
     // ---------- Relasi ----------
     public function attempts(): HasMany
     {
@@ -144,68 +201,6 @@ protected function school(): Attribute
 {
     return Attribute::get(fn () => $this->schoolRef?->name);
 }
-
-    // ---------- Privasi & persetujuan ----------
-    public function consents(): HasMany
-    {
-        return $this->hasMany(Consent::class);
-    }
-
-    public function age(): ?int
-    {
-        return $this->birth_date?->age;
-    }
-
-    /** Di bawah usia dewasa (default 18 tahun, lihat config/privacy.php). */
-    public function isMinor(): bool
-    {
-        return $this->age() !== null && $this->age() < config('privacy.adult_age');
-    }
-
-    /** Persetujuan aktif untuk versi kebijakan yang berlaku sekarang. */
-    private function activeConsent(string $type): ?Consent
-    {
-        return $this->consents
-            ->where('type', $type)
-            ->where('policy_version', config('privacy.policy_version'))
-            ->whereNull('revoked_at')
-            ->sortByDesc('id')
-            ->first();
-    }
-
-    public function hasAcceptedPolicy(): bool
-    {
-        return $this->activeConsent('privacy') !== null;
-    }
-
-    public function hasParentalConsent(): bool
-    {
-        return $this->activeConsent('parental') !== null;
-    }
-
-    /**
-     * Apa yang masih menahan akun ini dari memakai aplikasi?
-     * null = aman. 'policy' = belum setuju kebijakan, 'birth_date' = siswa belum mengisi
-     * tanggal lahir, 'parent' = siswa di bawah 18 tahun belum disetujui orang tua / wali.
-     */
-    public function privacyGate(): ?string
-    {
-        if (! $this->hasAcceptedPolicy()) {
-            return 'policy';
-        }
-
-        if ($this->role === 'student') {
-            if ($this->birth_date === null) {
-                return 'birth_date';
-            }
-
-            if ($this->isMinor() && ! $this->hasParentalConsent()) {
-                return 'parent';
-            }
-        }
-
-        return null;
-    }
 
     // ---------- Level dan XP ----------
     public function levelData(): array

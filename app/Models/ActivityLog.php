@@ -18,7 +18,6 @@ class ActivityLog extends Model
         'user' => 'Pengguna',
         'content' => 'Konten',
         'school' => 'Sekolah',
-        'privacy' => 'Privasi',
         'system' => 'Sistem',
     ];
 

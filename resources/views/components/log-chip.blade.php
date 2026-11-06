@@ -6,7 +6,6 @@
         'user' => 'text-amber-300',
         'content' => 'text-emerald-300',
         'school' => 'text-violet-300',
-        'privacy' => 'text-sky-300',
         'system' => 'text-rose-300',
     ][$category] ?? 'text-slate-300';
 @endphp

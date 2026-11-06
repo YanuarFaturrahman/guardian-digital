@@ -14,6 +14,7 @@ use App\Observers\AuditObserver;
 use Illuminate\Support\Facades\URL;
 use Illuminate\Support\ServiceProvider;
 use Illuminate\Auth\Notifications\ResetPassword;
+use Illuminate\Auth\Notifications\VerifyEmail;
 use Illuminate\Notifications\Messages\MailMessage;
 
 class AppServiceProvider extends ServiceProvider
@@ -52,6 +53,16 @@ class AppServiceProvider extends ServiceProvider
                     ['dari' => $from, 'ke' => $user->role],
                 );
             }
+        });
+
+        VerifyEmail::toMailUsing(function ($notifiable, string $url) {
+            return (new MailMessage)
+                ->subject('Verifikasi Email Guardian Digital')
+                ->greeting("Halo, {$notifiable->name}!")
+                ->line('Terima kasih sudah mendaftar. Klik tombol di bawah untuk memastikan email ini milikmu.')
+                ->action('Verifikasi Email', $url)
+                ->line('Tautan ini berlaku 60 menit. Jika kamu tidak merasa mendaftar, abaikan email ini.')
+                ->salutation('Salam, Tim Guardian Digital');
         });
 
         ResetPassword::toMailUsing(function ($notifiable, string $token) {

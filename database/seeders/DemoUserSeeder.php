@@ -16,25 +16,32 @@ class DemoUserSeeder extends Seeder
     {
         $school = School::findOrCreateByName('SMA Negeri 1 Contoh');
 
+        // Semua akun demo sudah terverifikasi dan menyetujui kebijakan privasi (siswa demo dewasa).
+        $ok = fn (array $extra = []) => $extra + [
+            'email_verified_at' => now(),
+            'privacy_accepted_at' => now(),
+            'privacy_policy_version' => config('privacy.policy_version'),
+        ];
+
                 User::create([
             'name' => 'Admin Guardian', 'email' => 'admin@guardian.test',
             'password' => 'password', 'role' => 'superadmin', 'avatar' => '👑',
-        ]);
+        ] + $ok());
 
         User::create([
             'name' => 'Admin SMAN 1 Contoh', 'email' => 'adminsekolah@guardian.test',
             'password' => 'password', 'role' => 'school_admin', 'school_id' => $school->id, 'avatar' => '🏫',
-        ]);
+        ] + $ok());
 
         $teacher = User::create([
             'name' => 'Bu Sari (Guru BK)', 'email' => 'guru@guardian.test',
             'password' => 'password', 'role' => 'teacher', 'school_id' => $school->id, 'avatar' => '🦉',
-        ]);
+        ] + $ok());
 
         $parent = User::create([
             'name' => 'Ibu Rani', 'email' => 'ortu@guardian.test',
             'password' => 'password', 'role' => 'parent', 'avatar' => '🌻',
-        ]);
+        ] + $ok());
 
         $classroom = Classroom::create([
             'teacher_id' => $teacher->id, 'name' => 'XI IPS 2', 'join_code' => 'KELAS1',
@@ -55,7 +62,7 @@ class DemoUserSeeder extends Seeder
             $student = User::create([
                 'name' => $name, 'email' => $email, 'password' => 'password',
                 'role' => 'student', 'school_id' => $school->id, 'avatar' => $avatar,
-            ]);
+            ] + $ok(['birth_date' => '2005-05-17']));
 
             $classroom->students()->attach($student->id);
 
