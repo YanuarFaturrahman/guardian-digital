@@ -34,6 +34,10 @@
                         <td class="text-xs text-slate-300">{{ $backup['time']->format('d M Y H:i') }}<div class="text-slate-500">{{ $backup['time']->diffForHumans() }}</div></td>
                         <td class="space-x-3 whitespace-nowrap text-right">
                             <a href="{{ route('admin.system.backups.download', $backup['name']) }}" class="text-guard-400 hover:underline">Unduh</a>
+                            <form method="POST" action="{{ route('admin.system.backups.verify', $backup['name']) }}" class="inline">
+                                @csrf
+                                <button class="text-emerald-300 hover:underline" title="Periksa apakah arsip utuh dan bisa dipulihkan">Verifikasi</button>
+                            </form>
                             <form method="POST" action="{{ route('admin.system.backups.destroy', $backup['name']) }}" class="inline" onsubmit="return confirm('Hapus backup ini?')">
                                 @csrf @method('DELETE')
                                 <button class="text-rose-300 hover:underline">Hapus</button>

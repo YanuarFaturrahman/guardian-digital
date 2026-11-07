@@ -22,6 +22,22 @@
         <x-stat label="Backup terakhir" :value="$lastBackup ? $lastBackup['time']->diffForHumans() : 'Belum ada'" icon="💾" />
     </div>
 
+    <div class="mb-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        <a href="{{ route('admin.system.health') }}" class="block transition hover:-translate-y-0.5">
+            <x-stat label="Status sistem terakhir" :icon="match($health?->status) { 'ok' => '🟢', 'degraded' => '🟠', 'down' => '🔴', default => '⚪' }"
+                    :value="$health ? ['ok' => 'Sehat', 'degraded' => 'Terganggu', 'down' => 'Down'][$health->status] : 'Belum diperiksa'" />
+        </a>
+        <a href="{{ route('admin.system.health') }}" class="block transition hover:-translate-y-0.5">
+            <x-stat label="Uptime 7 hari" :value="$uptime7d !== null ? $uptime7d . '%' : '-'" icon="📈" />
+        </a>
+        <a href="{{ route('admin.system.errors') }}" class="block transition hover:-translate-y-0.5">
+            <x-stat label="Error belum selesai" :value="$openErrors" icon="🐞" />
+        </a>
+        <a href="{{ route('admin.system.announcements.index') }}" class="block transition hover:-translate-y-0.5">
+            <x-stat label="Pengumuman tampil" :value="$liveAnnouncements" icon="📣" />
+        </a>
+    </div>
+
     <div class="grid gap-6 lg:grid-cols-2">
         <div class="card">
             <h2 class="h2 mb-3">Pemeriksaan keamanan</h2>

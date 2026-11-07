@@ -4,6 +4,9 @@ namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Models\ActivityLog;
+use App\Models\Announcement;
+use App\Models\ErrorLog;
+use App\Models\HealthCheck;
 use App\Models\Setting;
 use App\Services\BackupService;
 use Illuminate\Http\Request;
@@ -46,6 +49,10 @@ class SystemController extends Controller
                 'Batas unggah PHP' => ini_get('upload_max_filesize') . ' (post: ' . ini_get('post_max_size') . ')',
             ],
             'recent' => ActivityLog::latest('id')->take(6)->get(),
+            'health' => HealthCheck::latest('id')->first(),
+            'uptime7d' => HealthCheck::uptime(7),
+            'openErrors' => ErrorLog::open()->count(),
+            'liveAnnouncements' => Announcement::live()->count(),
         ]);
     }
 

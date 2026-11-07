@@ -33,6 +33,8 @@ class SettingController extends Controller
             'max_upload_kb' => ['required', 'integer', 'min:100', 'max:51200'],
             'backup_keep' => ['required', 'integer', 'min:1', 'max:60'],
             'log_retention_days' => ['required', 'integer', 'min:7', 'max:730'],
+            'error_retention_days' => ['nullable', 'integer', 'min:1', 'max:365'],
+            'health_retention_days' => ['nullable', 'integer', 'min:1', 'max:365'],
             'external_api_url' => ['nullable', 'url:https', 'max:255'],
             'external_api_key' => ['nullable', 'string', 'max:255'],
         ], [
@@ -40,6 +42,8 @@ class SettingController extends Controller
             'max_upload_kb.max' => 'Batas unggah maksimal 51200 KB (50 MB).',
             'backup_keep.min' => 'Simpan minimal 1 backup otomatis.',
             'log_retention_days.min' => 'Log disimpan minimal 7 hari.',
+            'error_retention_days.min' => 'Catatan error disimpan minimal 1 hari.',
+            'health_retention_days.min' => 'Riwayat kesehatan disimpan minimal 1 hari.',
             'external_api_url.url' => 'Alamat API harus berupa URL https yang valid.',
         ]);
 
@@ -51,6 +55,10 @@ class SettingController extends Controller
             'backup_auto' => $request->boolean('backup_auto'),
             'backup_keep' => (int) $data['backup_keep'],
             'log_retention_days' => (int) $data['log_retention_days'],
+            // Kolom baru: bila tidak dikirim (formulir lama), pertahankan nilai yang tersimpan.
+            'error_retention_days' => (int) ($data['error_retention_days'] ?? Setting::read('error_retention_days')),
+            'health_retention_days' => (int) ($data['health_retention_days'] ?? Setting::read('health_retention_days')),
+            'alerts_enabled' => $request->boolean('alerts_enabled'),
             'external_api_enabled' => $request->boolean('external_api_enabled'),
             'external_api_url' => trim((string) ($data['external_api_url'] ?? '')),
         ];

@@ -16,6 +16,7 @@
 <body class="min-h-screen font-sans text-slate-100 antialiased">
 
     @include('partials.navbar')
+    @include('partials.announcements')
 
     <main class="mx-auto max-w-6xl px-4 py-8">
         @include('partials.flash')

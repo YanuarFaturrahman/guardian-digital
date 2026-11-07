@@ -72,6 +72,35 @@
         </section>
 
         <section class="card space-y-4">
+            <h2 class="h2">🩺 Pemantauan &amp; peringatan</h2>
+
+            <label class="flex items-start gap-3 text-sm">
+                <input type="checkbox" name="alerts_enabled" value="1" class="mt-1 h-4 w-4 accent-cyan-400" @checked(old('alerts_enabled', $v['alerts_enabled']))>
+                <span>
+                    <span class="font-medium">Kirim peringatan email ke superadmin</span>
+                    <span class="block text-xs text-slate-400">Email dikirim saat sistem terganggu atau tidak bisa diakses, dan saat backup gagal atau rusak. Satu jenis peringatan maksimal sekali per {{ \App\Support\SystemAlert::COOLDOWN_HOURS }} jam.
+                        @unless (\App\Support\MailStatus::isDeliverable())
+                            <strong class="text-amber-300">Saat ini email belum benar-benar terkirim ({{ \App\Support\MailStatus::mailer() }}), jadi peringatan tidak akan sampai.</strong>
+                        @endunless
+                    </span>
+                </span>
+            </label>
+
+            <div class="grid gap-4 sm:grid-cols-2">
+                <div>
+                    <label class="label" for="error_retention_days">Simpan catatan error (hari)</label>
+                    <input id="error_retention_days" type="number" name="error_retention_days" min="1" max="365" class="input" value="{{ old('error_retention_days', $v['error_retention_days']) }}">
+                    <p class="mt-1 text-xs text-slate-400">Dihitung dari kemunculan terakhir.</p>
+                </div>
+                <div>
+                    <label class="label" for="health_retention_days">Simpan riwayat kesehatan (hari)</label>
+                    <input id="health_retention_days" type="number" name="health_retention_days" min="1" max="365" class="input" value="{{ old('health_retention_days', $v['health_retention_days']) }}">
+                    <p class="mt-1 text-xs text-slate-400">Dasar perhitungan uptime. Disarankan 30 hari atau lebih.</p>
+                </div>
+            </div>
+        </section>
+
+        <section class="card space-y-4">
             <h2 class="h2">🔌 API eksternal</h2>
             <p class="text-xs text-slate-400">Tempat menyimpan alamat dan kunci layanan pihak ketiga. Nilainya bisa dibaca kode lewat <code>Setting::read('external_api_url')</code> dan <code>Setting::read('external_api_key')</code>. Aplikasi belum memakainya sampai kamu menyambungkannya.</p>
 

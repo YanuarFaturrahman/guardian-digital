@@ -1,6 +1,6 @@
 # Guardian Digital
 
-Platform belajar keamanan digital berbasis simulasi (Laravel). Panduan keamanan, privasi, dan deploy: [docs/KEAMANAN-DAN-PRIVASI.md](docs/KEAMANAN-DAN-PRIVASI.md).
+Platform belajar keamanan digital berbasis simulasi (Laravel). Panduan keamanan, privasi, dan deploy: [docs/KEAMANAN-DAN-PRIVASI.md](docs/KEAMANAN-DAN-PRIVASI.md). Pemantauan, error, pemeliharaan data, pengumuman, dan verifikasi backup (menu Sistem): [docs/KEBERLANJUTAN-SISTEM.md](docs/KEBERLANJUTAN-SISTEM.md).
 
 ```
 cp .env.example .env && php artisan key:generate

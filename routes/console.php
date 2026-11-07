@@ -21,3 +21,13 @@ Schedule::command('backup:run --type=auto')
 Schedule::call(fn () => ActivityLog::prune())
     ->dailyAt('03:00')
     ->name('prune-activity-logs');
+
+// Pemeriksaan kesehatan tiap 5 menit: dasar grafik uptime, "denyut" penjadwal, dan peringatan email.
+Schedule::command('system:health-check')
+    ->everyFiveMinutes()
+    ->withoutOverlapping();
+
+// Pembersihan data sementara/kedaluwarsa tiap hari: sesi, token reset, cache, error lama, riwayat kesehatan.
+Schedule::command('system:maintain')
+    ->dailyAt('04:00')
+    ->withoutOverlapping();

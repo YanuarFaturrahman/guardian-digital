@@ -254,6 +254,39 @@ Route::delete('/aksi/{action}', [Admin\ActionController::class, 'destroy'])->nam
             Route::delete('/backup/{file}', [Admin\BackupController::class, 'destroy'])
                 ->where('file', '[A-Za-z0-9._-]+')->name('backups.destroy');
 
+            Route::post('/backup/{file}/verifikasi', [Admin\BackupController::class, 'verify'])
+                ->where('file', '[A-Za-z0-9._-]+')->middleware('throttle:20,1')->name('backups.verify');
+
+            // Kesehatan sistem
+            Route::get('/kesehatan', [Admin\HealthController::class, 'index'])->name('health');
+            Route::post('/kesehatan/periksa', [Admin\HealthController::class, 'check'])
+                ->middleware('throttle:10,1')->name('health.check');
+
+            // Error aplikasi
+            Route::get('/error', [Admin\ErrorLogController::class, 'index'])->name('errors');
+            Route::post('/error/selesaikan-semua', [Admin\ErrorLogController::class, 'resolveAll'])->name('errors.resolve-all');
+            Route::delete('/error/bersihkan-selesai', [Admin\ErrorLogController::class, 'clearResolved'])->name('errors.clear-resolved');
+            Route::post('/error/{error}/selesai', [Admin\ErrorLogController::class, 'resolve'])->name('errors.resolve');
+            Route::delete('/error/{error}', [Admin\ErrorLogController::class, 'destroy'])->name('errors.destroy');
+
+            // Pemeliharaan data dan cache
+            Route::get('/pemeliharaan', [Admin\MaintenanceController::class, 'index'])->name('maintenance');
+            Route::post('/pemeliharaan/bersihkan', [Admin\MaintenanceController::class, 'purge'])
+                ->middleware('throttle:10,1')->name('maintenance.purge');
+            Route::post('/pemeliharaan/cache-tampilan', [Admin\MaintenanceController::class, 'clearViews'])->name('maintenance.views');
+            Route::post('/pemeliharaan/cache-pengaturan', [Admin\MaintenanceController::class, 'refreshSettings'])->name('maintenance.settings-cache');
+            Route::post('/pemeliharaan/kosongkan-cache', [Admin\MaintenanceController::class, 'flushCache'])
+                ->middleware('throttle:5,1')->name('maintenance.flush-cache');
+
+            // Pengumuman
+            Route::get('/pengumuman', [Admin\AnnouncementController::class, 'index'])->name('announcements.index');
+            Route::get('/pengumuman/baru', [Admin\AnnouncementController::class, 'create'])->name('announcements.create');
+            Route::post('/pengumuman', [Admin\AnnouncementController::class, 'store'])->name('announcements.store');
+            Route::get('/pengumuman/{announcement}/ubah', [Admin\AnnouncementController::class, 'edit'])->name('announcements.edit');
+            Route::put('/pengumuman/{announcement}', [Admin\AnnouncementController::class, 'update'])->name('announcements.update');
+            Route::post('/pengumuman/{announcement}/aktif', [Admin\AnnouncementController::class, 'toggle'])->name('announcements.toggle');
+            Route::delete('/pengumuman/{announcement}', [Admin\AnnouncementController::class, 'destroy'])->name('announcements.destroy');
+
             Route::get('/sesi', [Admin\SessionController::class, 'index'])->name('sessions');
             Route::post('/sesi/keluarkan-semua', [Admin\SessionController::class, 'destroyAll'])->name('sessions.destroy-all');
             Route::delete('/sesi/{id}', [Admin\SessionController::class, 'destroy'])

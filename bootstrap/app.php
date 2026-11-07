@@ -9,6 +9,13 @@ return Application::configure(basePath: dirname(__DIR__))
         web: __DIR__.'/../routes/web.php',
         commands: __DIR__.'/../routes/console.php',
         health: '/up',
+        then: function () {
+            // Endpoint ringan untuk monitor uptime eksternal (UptimeRobot, BetterStack, dll.).
+            // Sengaja di luar grup "web": tanpa sesi, tanpa cookie, tanpa mode pemeliharaan.
+            \Illuminate\Support\Facades\Route::get('/status', [\App\Http\Controllers\StatusController::class, 'show'])
+                ->middleware('throttle:60,1')
+                ->name('status');
+        },
     )
     ->withMiddleware(function (Middleware $middleware): void {
         // Tambahkan baris ini di paling atas dalam withMiddleware
@@ -30,5 +37,8 @@ return Application::configure(basePath: dirname(__DIR__))
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
-        //
+        // Simpan error ke database (menu Sistem > Error Aplikasi). Log bawaan tetap berjalan.
+        $exceptions->report(function (\Throwable $e) {
+            \App\Support\ErrorReporter::capture($e);
+        });
     })->create();

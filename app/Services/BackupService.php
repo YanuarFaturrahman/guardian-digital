@@ -124,6 +124,86 @@ class BackupService
         return $name;
     }
 
+
+    /**
+     * Periksa integritas satu cadangan: arsip gzip utuh (tidak terpotong/rusak) dan
+     * isinya mengenali format yang benar. Tidak memulihkan apa pun.
+     *
+     * @return array{ok:bool,message:string}
+     */
+    public function verify(string $name): array
+    {
+        if (! $this->exists($name)) {
+            return ['ok' => false, 'message' => 'Berkas backup tidak ditemukan.'];
+        }
+
+        $isSqlite = str_contains($name, '.sqlite.');
+        $in = @fopen($this->path($name), 'rb');
+
+        if ($in === false) {
+            return ['ok' => false, 'message' => 'Berkas backup tidak bisa dibuka.'];
+        }
+
+        $ctx = inflate_init(ZLIB_ENCODING_GZIP);
+        $head = '';
+        $tail = '';
+        $tables = 0;
+        $carry = '';
+
+        try {
+            while (! feof($in)) {
+                $chunk = fread($in, 1024 * 256);
+
+                if ($chunk === false || $chunk === '') {
+                    break;
+                }
+
+                $data = @inflate_add($ctx, $chunk, ZLIB_NO_FLUSH);
+
+                if ($data === false) {
+                    return ['ok' => false, 'message' => 'Arsip rusak: data gzip tidak bisa dibaca.'];
+                }
+
+                if (strlen($head) < 64) {
+                    $head .= substr($data, 0, 64 - strlen($head));
+                }
+
+                if (! $isSqlite) {
+                    // Sisa 13 karakter dari potongan sebelumnya (pola 14 karakter) agar tidak terhitung dua kali.
+                    $buffer = $carry . $data;
+                    $tables += substr_count($buffer, "\nCREATE TABLE ");
+                    $carry = substr($buffer, -13);
+                }
+
+                $tail = substr($tail . $data, -200);
+            }
+        } catch (Throwable $e) {
+            return ['ok' => false, 'message' => 'Arsip rusak: ' . $e->getMessage()];
+        } finally {
+            fclose($in);
+        }
+
+        if (inflate_get_status($ctx) !== ZLIB_STREAM_END) {
+            return ['ok' => false, 'message' => 'Arsip terpotong (tidak lengkap). Buat backup baru.'];
+        }
+
+        if ($isSqlite) {
+            return str_starts_with($head, "SQLite format 3\0")
+                ? ['ok' => true, 'message' => 'Arsip utuh dan berisi database SQLite yang valid.']
+                : ['ok' => false, 'message' => 'Arsip utuh, tetapi isinya bukan database SQLite.'];
+        }
+
+        if (! str_contains($head, '-- Guardian Digital: cadangan database')) {
+            return ['ok' => false, 'message' => 'Arsip utuh, tetapi bukan backup Guardian Digital.'];
+        }
+
+        if (! str_contains($tail, 'SET FOREIGN_KEY_CHECKS=1;')) {
+            return ['ok' => false, 'message' => 'Backup tidak selesai ditulis (penutup tidak ditemukan).'];
+        }
+
+        return ['ok' => true, 'message' => "Arsip utuh dan lengkap ({$tables} tabel tercadangkan)."];
+    }
+
     /** Hapus cadangan otomatis yang melebihi batas simpan. Cadangan manual tidak disentuh. */
     public function pruneAuto(int $keep): int
     {

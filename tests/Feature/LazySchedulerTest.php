@@ -37,6 +37,7 @@ class LazySchedulerTest extends TestCase
         // VACUUM (SQLite) tidak bisa di dalam transaksi tes, jadi pembuat backup di-mock.
         $this->mock(BackupService::class, function ($m) {
             $m->shouldReceive('create')->once()->with('auto')->andReturn('backup-20261105-033000-auto.sql.gz');
+            $m->shouldReceive('verify')->once()->andReturn(['ok' => true, 'message' => 'Arsip utuh.']);
             $m->shouldReceive('pruneAuto')->once()->andReturn(0);
         });
 
